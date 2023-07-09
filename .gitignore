@@ -1,0 +1,13 @@
+*.o
+.DS_Store
+/build
+/dist
+/*.egg-info
+/.venv
+__pycache__
+/config.json
+/config.toml
+/*.sublime-*
+/tmp
+.mypy_cache
+.vscode
