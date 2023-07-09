@@ -8,7 +8,7 @@ makedepends=('python-installer' 'python-build')
 checkdepends=()
 license=(Apache)
 arch=('any')
-_commit=asdf
+_commit='30edf45971f4d75528d5c55212d6e23e39736cb1'
 source=('git+https://github.com/macos-pacman/pmutils.git#commit=${_commit}')
 sha256sums=('SKIP')
 
