@@ -32,7 +32,7 @@ def time_to_relative_string(t: int) -> str:
 
 def bytes_to_str(x: int) -> str:
 	if x < 1024:
-		return f"{x}"
+		return f"{x}b"
 	elif x < 1024 ** 2:
 		return f"{x / 1024:.1f}k"
 	elif x < 1024 ** 3:
@@ -89,7 +89,7 @@ def show_status(cfg_path: str, interface: Optional[str], show_keys: bool):
 					print(f"    {msg.BOLD}public-key:{msg.ALL_OFF}  {msg.PINK_NB}{pub_key}{msg.ALL_OFF}")
 
 				if endpoint_str == "(none)":
-					eps = f"{msg.GREY}(none)"
+					eps = f"{msg.GREY}none"
 				else:
 					ip, port = endpoint_str.split(':')
 					eps = f"{msg.PINK_NB}{ip}{msg.ALL_OFF}{msg.GREY}:{port}"
