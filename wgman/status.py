@@ -88,13 +88,23 @@ def show_status(cfg_path: str, interface: Optional[str], show_keys: bool):
 				if show_keys:
 					print(f"    {msg.BOLD}public-key:{msg.ALL_OFF}  {msg.PINK_NB}{pub_key}{msg.ALL_OFF}")
 
-				ip, port = endpoint_str.split(':')
+				if endpoint_str == "(none)":
+					eps = f"{msg.GREY}(none)"
+				else:
+					ip, port = endpoint_str.split(':')
+					eps = f"{msg.PINK_NB}{ip}{msg.ALL_OFF}{msg.GREY}:{port}"
 
-				handshake_str = time_to_relative_string(int(last_handshake))
+				if int(last_handshake) != 0:
+					handshake_str = time_to_relative_string(int(last_handshake))
+					ago = "ago"
+				else:
+					handshake_str = f"{msg.GREY}never"
+					ago = ""
+
 				tx_str = bytes_to_str(int(tx))
 				rx_str = bytes_to_str(int(rx))
-				print(f"    {msg.BOLD}conn:        {msg.ALL_OFF}{msg.PINK_NB}{ip}{msg.ALL_OFF}{msg.GREY}:{port}{msg.ALL_OFF}")
-				print(f"    {msg.BOLD}last:        {msg.ALL_OFF}{msg.PINK_NB}{handshake_str}{msg.ALL_OFF} {msg.BOLD}ago{msg.ALL_OFF}")
+				print(f"    {msg.BOLD}conn:        {msg.ALL_OFF}{eps}{msg.ALL_OFF}")
+				print(f"    {msg.BOLD}last:        {msg.ALL_OFF}{msg.PINK_NB}{handshake_str}{msg.ALL_OFF} {msg.BOLD}{ago}{msg.ALL_OFF}")
 				print(f"    {msg.BOLD}traffic:     {msg.ALL_OFF}{msg.PINK_NB}{tx_str}{msg.ALL_OFF} {msg.BOLD}sent{msg.ALL_OFF}", end='')
 				print(f"{msg.ALL_OFF}, {msg.PINK_NB}{rx_str}{msg.ALL_OFF} {msg.BOLD}received{msg.ALL_OFF}")
 				print(f"")
