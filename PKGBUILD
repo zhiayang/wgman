@@ -1,23 +1,23 @@
 pkgname=wgman
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Simple WireGuard wrapper-manager-thing'
 url='https://github.com/zhiayang/wgman'
-depends=('python' 'python-click' 'python-psutil' 'python-elevate')
-makedepends=('python-installer' 'python-build' 'python-setuptools' 'python-wheel')
+depends=('wireguard-tools')
+makedepends=()
 checkdepends=()
 license=(Apache)
 arch=('any')
-_commit='30edf45971f4d75528d5c55212d6e23e39736cb1'
+_commit='70f9428031aa2cdefe62afe0943081dae938f0e4'
 source=("git+https://github.com/zhiayang/wgman.git#commit=${_commit}")
 sha256sums=('SKIP')
 
 build() {
 	cd wgman
-	python -m build --wheel --no-isolation
+	make build
 }
 
 package() {
 	cd wgman
-	python -m installer --destdir="$pkgdir" dist/*.whl
+	install -Dm644 build/wgman /usr/bin/wgman
 }
