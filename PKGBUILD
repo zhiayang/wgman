@@ -19,5 +19,5 @@ build() {
 
 package() {
 	cd wgman
-	install -Dm644 build/wgman /usr/bin/wgman
+	install -Dm644 build/wgman "$pkgdir"/usr/bin/wgman
 }
