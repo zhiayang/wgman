@@ -1,5 +1,5 @@
 pkgname=wgman
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='Simple WireGuard wrapper-manager-thing'
 url='https://github.com/zhiayang/wgman'

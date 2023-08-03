@@ -13,6 +13,7 @@
 
 #include "zpr.h"
 #include "zst.h"
+#include "zprocpipe.h"
 
 using zst::Ok;
 using zst::Err;
@@ -83,6 +84,17 @@ namespace wg
 	};
 
 	bool is_verbose();
+
+	enum class perms
+	{
+		NONE,
+		ROOT,
+		CAPABLE,
+	};
+
+	perms check_perms();
+	void set_ambient_perms();
+	void reset_ambient_perms();
 
 	zst::Failable<int> up(const Config& config);
 	zst::Failable<int> down(const Config& config);
@@ -157,6 +169,8 @@ namespace msg
 
 namespace util
 {
+	std::pair<zprocpipe::Process, int> try_command(const std::string& cmd, const std::vector<std::string>& args);
+
 	struct IPSubnet
 	{
 		uint32_t ip;

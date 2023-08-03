@@ -17,16 +17,6 @@ namespace wg
 {
 	namespace stdfs = std::filesystem;
 
-	static std::pair<zprocpipe::Process, int> try_command(const std::string& cmd, const std::vector<std::string>& args)
-	{
-		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args);
-		if(not maybe_proc.has_value())
-			msg::error_and_exit("Failed to launch {}{#}: {}", cmd, args, err);
-
-		auto code = maybe_proc->wait();
-		return std::make_pair(std::move(*maybe_proc), code);
-	}
-
 	static Result<zprocpipe::Process, int> run_cmd(const std::string& cmd, const std::vector<std::string>& args)
 	{
 		if(is_verbose())
@@ -68,7 +58,7 @@ namespace wg
 			return Ok();
 		}
 
-		if(auto [_, code] = try_command("ip", { "link", "show", "dev", config.name }); code == 0)
+		if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", config.name }); code == 0)
 			return msg::error("Interface '{}' already exists", config.name);
 
 		msg::log("Creating interface {}", config.name);
@@ -149,7 +139,7 @@ namespace wg
 			return Ok();
 		}
 
-		if(auto [_, code] = try_command("ip", { "link", "show", "dev", config.name }); code != 0)
+		if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", config.name }); code != 0)
 			return msg::error("Interface '{}' does not exist", config.name);
 
 		msg::log("Removing interface {}", config.name);

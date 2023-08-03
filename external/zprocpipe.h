@@ -726,17 +726,25 @@ namespace zprocpipe
 			return out_str;
 		}
 
-		inline friend std::pair<std::optional<Process>, std::string>
-		runProcess(const std::string& process, const std::vector<std::string>& args, const std::filesystem::path& cwd);
+		inline friend std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
+		    const std::vector<std::string>& args,
+		    const std::filesystem::path& cwd,
+		    bool capture_stdout,
+		    bool capture_stderr);
 
-		inline friend std::pair<std::optional<Process>, std::string>
-		runProcess(const std::string& process, const std::vector<std::string>& args);
+		inline friend std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
+		    const std::vector<std::string>& args,
+		    bool capture_stdout,
+		    bool capture_stderr);
 	};
 
 
 
-	inline std::pair<std::optional<Process>, std::string>
-	runProcess(const std::string& process, const std::vector<std::string>& args, const std::filesystem::path& cwd)
+	inline std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
+	    const std::vector<std::string>& args,
+	    const std::filesystem::path& cwd,
+	    bool capture_stdout = true,
+	    bool capture_stderr = true)
 	{
 		auto [stdin_pipe_read, stdin_pipe_write] = os::make_pipe();
 		auto [stdout_pipe_read, stdout_pipe_write] = os::make_pipe();
@@ -753,8 +761,11 @@ namespace zprocpipe
 		else if(child == 0)
 		{
 			os::dupe_fd2(stdin_pipe_read, STDIN_FILENO);
-			os::dupe_fd2(stdout_pipe_write, STDOUT_FILENO);
-			os::dupe_fd2(stderr_pipe_write, STDERR_FILENO);
+			if(capture_stdout)
+				os::dupe_fd2(stdout_pipe_write, STDOUT_FILENO);
+
+			if(capture_stderr)
+				os::dupe_fd2(stderr_pipe_write, STDERR_FILENO);
 
 			os::close_file(stdin_pipe_write);
 			os::close_file(stdout_pipe_read);
@@ -786,9 +797,11 @@ namespace zprocpipe
 #endif
 	}
 
-	inline std::pair<std::optional<Process>, std::string>
-	runProcess(const std::string& process, const std::vector<std::string>& args)
+	inline std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
+	    const std::vector<std::string>& args,
+	    bool capture_stdout = true,
+	    bool capture_stderr = true)
 	{
-		return runProcess(process, args, std::filesystem::current_path());
+		return runProcess(process, args, std::filesystem::current_path(), capture_stdout, capture_stderr);
 	}
 }

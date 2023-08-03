@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include <chrono>
+#include <algorithm>
 #include <filesystem>
 
 #include "wgman.h"
@@ -13,7 +14,9 @@
 
 namespace wg
 {
+	namespace zpp = zprocpipe;
 	namespace stdfs = std::filesystem;
+
 	static std::string time_to_relative_string(int64_t time)
 	{
 		namespace sc = std::chrono;
@@ -49,12 +52,26 @@ namespace wg
 	{
 		if(n < 1024)
 			return zpr::sprint("{}b", n);
-		else if(n < 1024 * 1024)
+		else if(n < 1024ull * 1024ull)
 			return zpr::sprint("{.1f}k", static_cast<double>(n) / 1024.0);
-		else if(n < 1024 * 1024 * 1024)
+		else if(n < 1024ull * 1024ull * 1024ull)
 			return zpr::sprint("{.1f}M", static_cast<double>(n) / 1024.0 / 1024.0);
-		else
+		else if(n < 1024ull * 1024ull * 1024ull * 1024ull)
 			return zpr::sprint("{.1f}G", static_cast<double>(n) / 1024.0 / 1024.0 / 1024.0);
+		else
+			return zpr::sprint("{.1f}T", static_cast<double>(n) / 1024.0 / 1024.0 / 1024.0 / 1024.0);
+	}
+
+	static Result<zpp::Process, std::string> wg_show(const std::string& iface)
+	{
+		set_ambient_perms();
+		auto [proc, err] = zpp::runProcess("wg", { "show", iface, "dump" }, /* stdout: */ true, /* stderr: */ false);
+		reset_ambient_perms();
+
+		if(not proc.has_value())
+			return Err(zpr::sprint("Could not read '{}': {}", iface, std::move(err)));
+
+		return Ok(std::move(*proc));
 	}
 
 	void status(const std::string& config_path_, const std::optional<std::string>& interface, bool show_keys)
@@ -89,14 +106,30 @@ namespace wg
 				msg::error_and_exit("Could not enumerate config files: {}", ec.message());
 		}
 
+		std::sort(interfaces.begin(), interfaces.end());
 		for(auto& iface : interfaces)
 		{
 			auto config = Config::load(config_path / (iface + ".toml"));
-			auto [maybe_proc, err] = zprocpipe::runProcess("wg", { "show", iface, "dump" });
-			if(not maybe_proc.has_value())
-				msg::error("Error reading interface '{}': {}", iface, err);
 
-			maybe_proc->wait();
+			if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", iface }); code != 0)
+			{
+				zpr::println("{}interface {}{}{}: {}down{}", msg::BOLD, msg::GREEN, iface, //
+				    msg::ALL_OFF, msg::RED, msg::ALL_OFF);
+				continue;
+			}
+
+			auto maybe_proc = wg_show(iface);
+			if(maybe_proc.is_err())
+			{
+				msg::error("{}", maybe_proc.error());
+				continue;
+			}
+
+			if(auto code = maybe_proc->wait(); code != 0)
+			{
+				msg::error("`wg show` exited with non-zero code {}", code);
+				continue;
+			}
 
 			auto iface_ip = zst::str_view(config.subnet).take_until('/');
 			auto iface_cidr = zst::str_view(config.subnet).drop_until('/').drop(1);

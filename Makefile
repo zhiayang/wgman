@@ -54,7 +54,7 @@ compdb: $(CXX_COMPDB) $(SPECIAL_HDRS_COMPDB)
 $(OUTPUT_BIN): $(PRECOMP_OBJ) $(CXXOBJ) $(EXTERNAL_OBJS)
 	@echo "  $(notdir $@)"
 	@mkdir -p $(shell dirname $@)
-	@$(CXX) $(CXXFLAGS) $(WARNINGS) $(DEFINES) $(LDFLAGS) $(LINKER_OPT_FLAGS) -o $@ $^
+	@$(CXX) $(CXXFLAGS) $(WARNINGS) $(DEFINES) $(LDFLAGS) $(LINKER_OPT_FLAGS) -o $@ $^ -lcap
 
 $(OUTPUT_DIR)/%.cpp.o: %.cpp $(PRECOMP_GCH)
 	@echo "  $<"

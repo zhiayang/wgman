@@ -34,7 +34,10 @@ int main(int argc, char** argv)
 {
 	if(argc == 1)
 	{
-		wg::status(DEFAULT_DIR, std::nullopt, /* show keys: */ true);
+		if(wg::check_perms() == wg::perms::NONE)
+			msg::error_and_exit("Insufficient permissions");
+		else
+			wg::status(DEFAULT_DIR, std::nullopt, /* show keys: */ true);
 	}
 	else
 	{
@@ -84,7 +87,10 @@ int main(int argc, char** argv)
 			if(sub_args.positional.size() == 1)
 				iface = sub_args.positional[0];
 
-			wg::status(dir, iface, /* show_keys: */ not sub_args.has_option("no-keys"));
+			if(wg::check_perms() == wg::perms::NONE)
+				msg::error_and_exit("Insufficient permissions");
+			else
+				wg::status(dir, iface, /* show_keys: */ not sub_args.has_option("no-keys"));
 		}
 		else if(strcmp(argv[0], "up") == 0)
 		{
@@ -98,9 +104,12 @@ int main(int argc, char** argv)
 			}
 
 			if(args.positional.size() != 1)
-				zpr::println("Expected exactly one interface");
+				msg::error_and_exit("Expected exactly one interface");
 
-			if(wg::up(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
+			if(wg::check_perms() != wg::perms::ROOT)
+				msg::error_and_exit("Insufficient permissions");
+
+			else if(wg::up(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
 				return 1;
 		}
 		else if(strcmp(argv[0], "down") == 0)
@@ -114,9 +123,12 @@ int main(int argc, char** argv)
 			}
 
 			if(args.positional.size() != 1)
-				zpr::println("Expected exactly one interface");
+				msg::error_and_exit("Expected exactly one interface");
 
-			if(wg::down(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
+			if(wg::check_perms() != wg::perms::ROOT)
+				msg::error_and_exit("Insufficient permissions");
+
+			else if(wg::down(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
 				return 1;
 		}
 		else if(strcmp(argv[0], "help") == 0)

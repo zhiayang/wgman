@@ -9,6 +9,16 @@
 
 namespace util
 {
+	std::pair<zprocpipe::Process, int> try_command(const std::string& cmd, const std::vector<std::string>& args)
+	{
+		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args);
+		if(not maybe_proc.has_value())
+			msg::error_and_exit("Failed to launch {}{#}: {}", cmd, args, err);
+
+		auto code = maybe_proc->wait();
+		return std::make_pair(std::move(*maybe_proc), code);
+	}
+
 	zst::str_view trim(zst::str_view sv)
 	{
 		if(sv.empty())
