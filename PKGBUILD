@@ -8,7 +8,7 @@ makedepends=()
 checkdepends=()
 license=(Apache)
 arch=('any')
-_commit='70f9428031aa2cdefe62afe0943081dae938f0e4'
+_commit='681e37454135990706bddf6445f1b8a012320572'
 source=("git+https://github.com/zhiayang/wgman.git#commit=${_commit}")
 sha256sums=('SKIP')
 
