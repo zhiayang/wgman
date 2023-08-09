@@ -1,3 +1,5 @@
+# Maintainer: zhiayang <zhiayang@nowhere>
+
 pkgname=wgman
 pkgver=0.2.3
 pkgrel=1
