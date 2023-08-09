@@ -28,7 +28,7 @@ namespace wg
 			msg::log3("{}", p);
 		}
 
-		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args);
+		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args, false, false);
 		if(not maybe_proc.has_value())
 			return msg::error("Failed to launch {}{#}: {}", cmd, args, err);
 
@@ -99,13 +99,14 @@ namespace wg
 
 		if(config.mtu.has_value())
 		{
-			msg::log2("Setting MTU to {}", *config.mtu);
-			TRY(run_cmd("ip", { "link", "set", "mtu", zpr::sprint("{}", *config.mtu), "dev", config.name }));
+			msg::log2("Setting MTU to {} and bringing up device", *config.mtu);
+			TRY(run_cmd("ip", { "link", "set", "mtu", zpr::sprint("{}", *config.mtu), "up", "dev", config.name }));
 		}
-
-		// up the device
-		msg::log("Bringing up device");
-		TRY(run_cmd("ip", { "link", "set", "up", "dev", config.name }));
+		else
+		{
+			msg::log("Bringing up device");
+			TRY(run_cmd("ip", { "link", "set", "dev", config.name, "up" }));
+		}
 
 		if(config.auto_forward || config.auto_masquerade || config.post_up_cmd.has_value())
 			msg::log2("Running PostUp hooks");
