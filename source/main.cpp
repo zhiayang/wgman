@@ -7,7 +7,7 @@
 
 #include "wgman.h"
 
-constexpr const char* DEFAULT_DIR = "/etc/wireguard";
+constexpr const char* DEFAULT_DIR = "/etc/wgman";
 
 static void print_help()
 {
@@ -21,7 +21,7 @@ static void print_help()
 	zpr::println("Common options:");
 	zpr::println("  -h, --help          show help for a subcommand");
 	zpr::println("  -v, --verbose       print verbose (more) information");
-	zpr::println("  -d, --dir <DIR>     look for configs in the given directory (default: /etc/wireguard)\n");
+	zpr::println("  -d, --dir <DIR>     look for configs in the given directory (default: /etc/wgman)\n");
 }
 
 static bool s_is_verbose = false;

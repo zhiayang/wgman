@@ -189,6 +189,7 @@ namespace util
 	template <typename Fn>
 	struct Defer
 	{
+		Defer(Fn f) : fn(f) { }
 		~Defer()
 		{
 			if(not disarmed)
