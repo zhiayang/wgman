@@ -58,6 +58,7 @@ namespace wg
 		std::string public_key;
 		std::optional<std::string> pre_shared_key;
 		std::optional<int> keepalive;
+		std::optional<std::string> endpoint;
 	};
 
 	struct Config

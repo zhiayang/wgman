@@ -140,6 +140,19 @@ namespace wg
 						keepalive = static_cast<int>(k);
 				}
 
+				std::optional<std::string> endpoint {};
+				if(auto tmp = peer["endpoint"]; tmp)
+				{
+					if(not tmp.is_string())
+						msg::error_and_exit("'endpoint' must be a string");
+
+					auto ep = *peer["endpoint"].value<std::string>();
+					if(not std::regex_match(ep, std::regex(R"((.+):([0-9]+))")))
+						msg::error_and_exit("Expected endpoint format: '<ip/url>:<port>'");
+					else
+						endpoint = std::move(ep);
+				}
+
 				std::optional<std::string> psk {};
 				if(auto tmp0 = peer["preshared-key"])
 					psk = *tmp0.value<std::string>();
@@ -155,6 +168,7 @@ namespace wg
 				    .public_key = read_key(*peer["public-key"].value<std::string>()),
 				    .pre_shared_key = psk,
 				    .keepalive = keepalive,
+				    .endpoint = std::move(endpoint),
 				});
 			}
 		}
@@ -222,11 +236,13 @@ namespace wg
 			ret += zpr::sprint("[Peer]\n");
 			ret += zpr::sprint("AllowedIPs = {}\n", peer.ip);
 			ret += zpr::sprint("PublicKey = {}\n", peer.public_key);
+
 			if(peer.pre_shared_key.has_value())
 				ret += zpr::sprint("PresharedKey = {}\n", *peer.pre_shared_key);
-
 			if(peer.keepalive.has_value())
 				ret += zpr::sprint("PersistentKeepalive = {}\n", *peer.keepalive);
+			if(peer.endpoint.has_value())
+				ret += zpr::sprint("Endpoint = {}\n", *peer.endpoint);
 
 			ret += "\n";
 		}
@@ -269,11 +285,13 @@ namespace wg
 			ret += zpr::sprint("[Peer]\n");
 			ret += zpr::sprint("AllowedIPs = {}\n", peer.ip);
 			ret += zpr::sprint("PublicKey = {}\n", peer.public_key);
+
 			if(peer.pre_shared_key.has_value())
 				ret += zpr::sprint("PresharedKey = {}\n", *peer.pre_shared_key);
-
 			if(peer.keepalive.has_value())
 				ret += zpr::sprint("PersistentKeepalive = {}\n", *peer.keepalive);
+			if(peer.endpoint.has_value())
+				ret += zpr::sprint("Endpoint = {}\n", *peer.endpoint);
 
 			ret += "\n";
 		}
