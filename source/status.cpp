@@ -110,6 +110,7 @@ namespace wg
 		for(auto& iface : interfaces)
 		{
 			auto config = Config::load(config_path / (iface + ".toml"));
+			zpr::print("{}", msg::ALL_OFF);
 
 			if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", iface }); code != 0)
 			{
@@ -139,18 +140,67 @@ namespace wg
 			zpr::println("  {}address:{}  {}{}{}{}/{}{}", msg::BOLD, msg::ALL_OFF, msg::YELLOW, iface_ip, msg::ALL_OFF,
 			    msg::BLUE_NB, iface_cidr, msg::ALL_OFF);
 
-			for(size_t i = 0;; i++)
+			std::vector<std::string> lines {};
+			while(true)
 			{
 				auto line = maybe_proc->readStdoutLine();
 				if(line.empty())
 					break;
+				lines.push_back(std::move(line));
+			}
 
-				auto parts = util::split_by_spaces(line);
+			std::vector<std::vector<zst::str_view>> line_parts {};
+			for(auto& line : lines)
+				line_parts.push_back(util::split_by_spaces(line));
 
+			std::sort(1 + line_parts.begin(), line_parts.end(), [](const auto& p1, const auto& p2) {
+				if(p1.size() != 8)
+					msg::error_and_exit("Malformed output from wg dump: '{}'", p1);
+				if(p2.size() != 8)
+					msg::error_and_exit("Malformed output from wg dump: '{}'", p2);
+
+				auto p1_ip = p1[3];
+				auto p2_ip = p2[3];
+
+				if(p1_ip.ends_with("/32"))
+					p1_ip.remove_suffix(3);
+
+				if(p2_ip.ends_with("/32"))
+					p2_ip.remove_suffix(3);
+
+				auto to_int = [](zst::str_view sv) -> int {
+					int ret = 0;
+					while(not sv.empty())
+					{
+						ret = (10 * ret) + (sv[0] - '0');
+						sv.remove_prefix(1);
+					}
+					return ret;
+				};
+
+				for(int i = 0; i < 4; i++)
+				{
+					auto a1 = p1_ip.take_until('/');
+					auto a2 = p2_ip.take_until('/');
+
+					if(a1 != a2)
+						return to_int(a1) < to_int(a2);
+
+					p1_ip.remove_prefix(a1.size() + 1);
+					p2_ip.remove_prefix(a2.size() + 1);
+				}
+
+				return false;
+			});
+
+
+			for(size_t i = 0; i < lines.size(); i++)
+			{
+				auto& parts = line_parts[i];
 				if(i == 0)
 				{
 					if(parts.size() != 4)
-						msg::error_and_exit("Malformed output from wg dump: '{}'", line);
+						msg::error_and_exit("Malformed output from wg dump: '{}'", lines[0]);
 
 					if(show_keys)
 					{
@@ -160,9 +210,6 @@ namespace wg
 				}
 				else
 				{
-					if(parts.size() != 8)
-						msg::error_and_exit("Malformed output from wg dump: '{}'", line);
-
 					auto pub_key = parts[0];
 					auto endpoint_str = parts[2];
 					auto ip_str = parts[3];

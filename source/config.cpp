@@ -74,16 +74,19 @@ namespace wg
 			msg::error_and_exit("Missing required key 'interface'");
 
 		auto& interface = *table["interface"].as_table();
-		for(auto key : { "subnet", "port", "private-key" })
+		for(auto key : { "subnet", "private-key" })
 		{
 			if(not interface.contains(key))
 				msg::error_and_exit("Missing required key '{}' in 'interface'", key);
 		}
 
 		int64_t port = 0;
-		if(not interface["port"].is_integer())
+		if(interface.contains("port") && not interface["port"].is_integer())
 			msg::error_and_exit("'port' key must be an integer");
-		else if(port = *interface["port"].value<int64_t>(); not(1 <= port && port <= 65535))
+		else if(interface.contains("port"))
+			port = *interface["port"].value<int64_t>();
+
+		if(not(1 <= port && port <= 65535))
 			msg::error_and_exit("'port' must be between 1 and 65535");
 
 		std::optional<int> mtu {};
@@ -227,8 +230,9 @@ namespace wg
 	{
 		std::string ret {};
 		ret += "[Interface]\n";
-		ret += zpr::sprint("ListenPort = {}\n", this->port);
 		ret += zpr::sprint("PrivateKey = {}\n", this->private_key);
+		if(this->port.has_value())
+			ret += zpr::sprint("ListenPort = {}\n", *this->port);
 
 		ret += "\n";
 		for(auto& peer : this->peers)
@@ -256,10 +260,12 @@ namespace wg
 		ret += "[Interface]\n";
 		ret += zpr::sprint("Address = {}\n", this->subnet);
 		ret += zpr::sprint("SaveConfig = false\n");
-		ret += zpr::sprint("ListenPort = {}\n", this->port);
 		ret += zpr::sprint("PrivateKey = {}\n", this->private_key);
 		if(this->mtu.has_value())
 			ret += zpr::sprint("MTU = {}\n", *this->mtu);
+
+		if(this->port.has_value())
+			ret += zpr::sprint("ListenPort = {}\n", *this->port);
 
 		if(this->auto_forward)
 		{

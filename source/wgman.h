@@ -66,7 +66,7 @@ namespace wg
 		std::string name;
 		std::optional<std::string> interface;
 		std::string subnet;
-		uint16_t port;
+		std::optional<uint16_t> port;
 		std::optional<int> mtu;
 
 		bool use_wg_quick;
