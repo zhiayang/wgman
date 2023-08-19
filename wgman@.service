@@ -1,0 +1,17 @@
+[Unit]
+Description=WireGuard via wgman for %I
+After=network-online.target nss-lookup.target
+Wants=network-online.target nss-lookup.target
+PartOf=wgman.target
+Documentation=https://github.com/zhiayang/wgman
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/wgman up %i
+ExecStop=/usr/bin/wgman down %i
+ExecReload=/usr/bin/wgman restart %i
+Environment=WG_ENDPOINT_RESOLUTION_RETRIES=infinity
+
+[Install]
+WantedBy=multi-user.target
