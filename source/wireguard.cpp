@@ -177,4 +177,24 @@ namespace wg
 		msg::log("Done!");
 		return Ok();
 	}
+
+
+	zst::Failable<int> restart(const Config& config)
+	{
+		if(pid_t child = fork(); child < 0)
+			return msg::error("fork(): %s (%d)", strerror(errno), errno);
+		else if(child != 0)
+			_exit(0);
+
+		// we are the child now
+		if(setsid() < 0)
+			return msg::error("setsid(): %s (%d)", strerror(errno), errno);
+
+		// to prevent leaving the thing in a down state if possible, ignore errors on down.
+		wg::down(config);
+
+		TRY(wg::up(config));
+		msg::log("Done!");
+		return Ok();
+	}
 }

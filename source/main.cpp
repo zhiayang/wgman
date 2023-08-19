@@ -17,6 +17,7 @@ static void print_help()
 	zpr::println("  status              show the status");
 	zpr::println("  up                  bring up an interface");
 	zpr::println("  down                bring down an interface");
+	zpr::println("  restart             restart (down then up) an interface");
 	zpr::println("");
 	zpr::println("Common options:");
 	zpr::println("  -h, --help          show help for a subcommand");
@@ -57,7 +58,9 @@ int main(int argc, char** argv)
 		auto dir = args.get_option("dir").value_or(DEFAULT_DIR);
 		s_is_verbose = args.has_option("verbose");
 
-		if(strcmp(argv[0], "status") == 0)
+		auto cmd = std::string_view(argv[0]);
+
+		if(cmd == "status")
 		{
 			if(args.has_option("help"))
 			{
@@ -92,13 +95,27 @@ int main(int argc, char** argv)
 			else
 				wg::status(dir, iface, /* show_keys: */ not sub_args.has_option("no-keys"));
 		}
-		else if(strcmp(argv[0], "up") == 0)
+		else if(cmd == "up" || cmd == "down" || cmd == "restart")
 		{
 			if(args.has_option("help"))
 			{
-				zpr::println("Usage: wgman up INTERFACE\n");
-				zpr::println("Bring up a WireGuard interface; its config file must exist,");
-				zpr::println("but the interface must not.");
+				zpr::println("Usage: wgman {} INTERFACE\n", cmd);
+				if(cmd == "up")
+				{
+					zpr::println("Bring up a WireGuard interface; its config file must exist,");
+					zpr::println("but the interface must not.");
+				}
+				else if(cmd == "down")
+				{
+					zpr::println("Usage: wgman down INTERFACE\n");
+					zpr::println("Bring down an existing WireGuard interface; it must exist.");
+				}
+				else
+				{
+					zpr::println("Usage: wgman restart INTERFACE\n");
+					zpr::println("Restart an existing WireGuard interface; it must exist.");
+				}
+
 				zpr::println("Does not take additional options.");
 				return 0;
 			}
@@ -109,29 +126,11 @@ int main(int argc, char** argv)
 			if(wg::check_perms() != wg::perms::ROOT)
 				msg::error_and_exit("Insufficient permissions");
 
-			else if(wg::up(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
+			auto fn = (cmd == "up" ? &wg::up : cmd == "down" ? &wg::down : &wg::restart);
+			if(fn(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
 				return 1;
 		}
-		else if(strcmp(argv[0], "down") == 0)
-		{
-			if(args.has_option("help"))
-			{
-				zpr::println("Usage: wgman down INTERFACE\n");
-				zpr::println("Bring down an existing WireGuard interface; it must exist.");
-				zpr::println("Does not take additional options.");
-				return 0;
-			}
-
-			if(args.positional.size() != 1)
-				msg::error_and_exit("Expected exactly one interface");
-
-			if(wg::check_perms() != wg::perms::ROOT)
-				msg::error_and_exit("Insufficient permissions");
-
-			else if(wg::down(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
-				return 1;
-		}
-		else if(strcmp(argv[0], "help") == 0)
+		else if(cmd == "help")
 		{
 			print_help();
 		}
