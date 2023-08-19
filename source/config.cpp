@@ -80,13 +80,13 @@ namespace wg
 				msg::error_and_exit("Missing required key '{}' in 'interface'", key);
 		}
 
-		int64_t port = 0;
+		std::optional<int64_t> port = 0;
 		if(interface.contains("port") && not interface["port"].is_integer())
 			msg::error_and_exit("'port' key must be an integer");
 		else if(interface.contains("port"))
 			port = *interface["port"].value<int64_t>();
 
-		if(not(1 <= port && port <= 65535))
+		if(port.has_value() && (1 <= port && port <= 65535))
 			msg::error_and_exit("'port' must be between 1 and 65535");
 
 		std::optional<int> mtu {};
@@ -203,7 +203,7 @@ namespace wg
 			.name = path.filename().string(),
 			.interface = interface["interface"].value<std::string>(),
 			.subnet = std::move(subnet),
-			.port = static_cast<uint16_t>(port),
+			.port = port.has_value() ? std::optional<uint16_t>(static_cast<uint16_t>(*port)) : std::nullopt,
 			.mtu = mtu,
 			.use_wg_quick = use_wg_quick,
 			.auto_forward = auto_forward,
