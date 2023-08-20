@@ -86,7 +86,7 @@ namespace wg
 		else if(interface.contains("port"))
 			port = *interface["port"].value<int64_t>();
 
-		if(port.has_value() && (1 <= port && port <= 65535))
+		if(port.has_value() && not(1 <= port && port <= 65535))
 			msg::error_and_exit("'port' must be between 1 and 65535");
 
 		std::optional<int> mtu {};
