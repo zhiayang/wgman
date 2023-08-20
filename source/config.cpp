@@ -80,7 +80,7 @@ namespace wg
 				msg::error_and_exit("Missing required key '{}' in 'interface'", key);
 		}
 
-		std::optional<int64_t> port = 0;
+		std::optional<int64_t> port {};
 		if(interface.contains("port") && not interface["port"].is_integer())
 			msg::error_and_exit("'port' key must be an integer");
 		else if(interface.contains("port"))
