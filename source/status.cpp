@@ -48,7 +48,7 @@ namespace wg
 		}
 	}
 
-	static std::string bytes_to_string(size_t n)
+	static std::string bytes_to_string(uint64_t n)
 	{
 		if(n < 1024)
 			return zpr::sprint("{}b", n);
@@ -276,8 +276,8 @@ namespace wg
 						print_args.ago = "";
 					}
 
-					print_args.tx = bytes_to_string(std::stoull(tx_bytes.str()));
-					print_args.rx = bytes_to_string(std::stoull(rx_bytes.str()));
+					print_args.tx = bytes_to_string(static_cast<uint64_t>(std::stoull(tx_bytes.str())));
+					print_args.rx = bytes_to_string(static_cast<uint64_t>(std::stoull(rx_bytes.str())));
 
 					zpr::println("    {}conn:        {}{}{}", msg::BOLD, msg::ALL_OFF, print_args.endpoint,
 					    msg::ALL_OFF);
