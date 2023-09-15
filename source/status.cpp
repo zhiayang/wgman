@@ -234,6 +234,8 @@ namespace wg
 							.ip = ip_str.str(),
 							.public_key = pub_key.str(),
 							.pre_shared_key = std::nullopt,
+							.keepalive = std::nullopt,
+							.endpoint = std::nullopt,
 						};
 					}
 
