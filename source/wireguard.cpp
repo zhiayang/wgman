@@ -86,16 +86,8 @@ namespace wg
 
 		kill_interface.disarm();
 
-		// add the routes and stuff
 		msg::log("IP setup");
 		TRY(run_cmd("ip", { "-4", "address", "add", config.subnet, "dev", config.name }));
-
-		// check which of the peer AllowedIPs are not covered by this subnet
-		for(auto& peer : config.peers)
-		{
-			if(not util::subnet_contains_ip(config.subnet, peer.ip))
-				TRY(run_cmd("ip", { "-4", "route", "add", peer.ip, "dev", config.name }));
-		}
 
 		if(config.mtu.has_value())
 		{
@@ -106,6 +98,20 @@ namespace wg
 		{
 			msg::log("Bringing up device");
 			TRY(run_cmd("ip", { "link", "set", "dev", config.name, "up" }));
+		}
+
+		// check which of the peer AllowedIPs are not covered by this subnet
+		for(auto& peer : config.peers)
+		{
+			auto maybe_add_route = [&config](const std::string& ip) -> zst::Failable<int> {
+				if(not util::subnet_contains_ip(config.subnet, ip))
+					TRY(run_cmd("ip", { "-4", "route", "add", ip, "dev", config.name }));
+				return Ok();
+			};
+
+			TRY(maybe_add_route(peer.ip));
+			for(auto& extra_ip : peer.extra_routes)
+				TRY(maybe_add_route(extra_ip));
 		}
 
 		if(config.auto_forward || config.auto_masquerade || config.post_up_cmd.has_value())

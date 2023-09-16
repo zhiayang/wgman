@@ -236,6 +236,7 @@ namespace wg
 							.pre_shared_key = std::nullopt,
 							.keepalive = std::nullopt,
 							.endpoint = std::nullopt,
+							.extra_routes = {},
 						};
 					}
 

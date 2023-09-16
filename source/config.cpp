@@ -165,6 +165,23 @@ namespace wg
 				if(psk.has_value())
 					psk = read_key(*psk);
 
+
+				std::vector<std::string> extra_routes {};
+				if(auto tmp = peer["extra-routes"]; tmp)
+				{
+					if(not tmp.is_array())
+						msg::error_and_exit("'extra-routes' must be an array");
+
+					auto& arr = *tmp.as_array();
+					for(auto& eip : arr)
+					{
+						if(not eip.is_string())
+							msg::error_and_exit("entries in 'extra-routes' must be strings");
+
+						extra_routes.push_back(*eip.value<std::string>());
+					}
+				}
+
 				peers.push_back(Peer {
 				    .name = std::string(name),
 				    .ip = ip,
@@ -172,6 +189,7 @@ namespace wg
 				    .pre_shared_key = psk,
 				    .keepalive = keepalive,
 				    .endpoint = std::move(endpoint),
+				    .extra_routes = std::move(extra_routes),
 				});
 			}
 		}
@@ -238,7 +256,11 @@ namespace wg
 		for(auto& peer : this->peers)
 		{
 			ret += zpr::sprint("[Peer]\n");
-			ret += zpr::sprint("AllowedIPs = {}\n", peer.ip);
+			auto allowed_ips = peer.ip;
+			for(auto& extra_ip : peer.extra_routes)
+				allowed_ips += zpr::sprint(", {}", extra_ip);
+
+			ret += zpr::sprint("AllowedIPs = {}\n", allowed_ips);
 			ret += zpr::sprint("PublicKey = {}\n", peer.public_key);
 
 			if(peer.pre_shared_key.has_value())
@@ -289,7 +311,11 @@ namespace wg
 		for(auto& peer : this->peers)
 		{
 			ret += zpr::sprint("[Peer]\n");
-			ret += zpr::sprint("AllowedIPs = {}\n", peer.ip);
+			auto allowed_ips = peer.ip;
+			for(auto& extra_ip : peer.extra_routes)
+				allowed_ips += zpr::sprint(", {}", extra_ip);
+
+			ret += zpr::sprint("AllowedIPs = {}\n", allowed_ips);
 			ret += zpr::sprint("PublicKey = {}\n", peer.public_key);
 
 			if(peer.pre_shared_key.has_value())
