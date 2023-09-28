@@ -22,7 +22,7 @@ namespace wg
 
 	bool does_interface_exist(const std::string& name)
 	{
-		auto [_, code] = util::try_command("ip", { "link", "show", "dev", config.name });
+		auto [_, code] = util::try_command("ip", { "link", "show", "dev", name });
 		return code == 0;
 	}
 
