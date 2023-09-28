@@ -15,9 +15,6 @@
 
 namespace wg
 {
-	// defined in wireguard_macos.cpp
-	Result<std::string, int> macos_get_real_interface(const std::string& wg_iface);
-
 	namespace stdfs = std::filesystem;
 	zst::Failable<int> interface_up_impl(const Config& config);
 	zst::Failable<int> interface_down_impl(const Config& config);

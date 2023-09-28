@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 		if(wg::check_perms() == wg::perms::NONE)
 			msg::error_and_exit("Insufficient permissions");
 		else
-			wg::status(DEFAULT_DIR, std::nullopt, /* show keys: */ true);
+			wg::status(DEFAULT_DIR, std::nullopt, /* show keys: */ false);
 	}
 	else
 	{
@@ -129,8 +129,8 @@ int main(int argc, char** argv)
 			if(args.positional.size() != 1)
 				msg::error_and_exit("Expected exactly one interface");
 
-			// if(wg::check_perms() != wg::perms::ROOT)
-			// 	msg::error_and_exit("Insufficient permissions");
+			if(wg::check_perms() != wg::perms::ROOT)
+				msg::error_and_exit("Insufficient permissions");
 
 			auto fn = (cmd == "up" ? &wg::up : cmd == "down" ? &wg::down : &wg::restart);
 			if(fn(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())

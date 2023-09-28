@@ -104,7 +104,7 @@ namespace wg
 			}
 
 			if(ec)
-				msg::error_and_exit("Could not enumerate config files: {}", ec.message());
+				msg::error_and_exit("Could not enumerate config files at {}: {}", config_path_, ec.message());
 		}
 
 		std::sort(interfaces.begin(), interfaces.end());
@@ -114,7 +114,7 @@ namespace wg
 			zpr::print("{}", msg::ALL_OFF);
 
 #if defined(__APPLE__)
-			auto maybe_real_iface = macos_get_real_interface(wg_iface);
+			auto maybe_real_iface = macos_get_real_interface(wg_iface, /* quiet: */ true);
 			if(maybe_real_iface.is_err())
 			{
 				zpr::println("{}interface {}{}{}: {}down{}", msg::BOLD, msg::GREEN, wg_iface, //
@@ -149,15 +149,43 @@ namespace wg
 			auto iface_ip = zst::str_view(config.subnet).take_until('/');
 			auto iface_cidr = zst::str_view(config.subnet).drop_until('/').drop(1);
 
+			{
 #if defined(__APPLE__)
-			zpr::println("{}interface {}{}{} [{}{}{}]{}", msg::BOLD, msg::GREEN, wg_iface, msg::UNCOLOUR, msg::BLUE,
-			    iface, msg::UNCOLOUR, msg::ALL_OFF);
+				if(config.nickname.has_value())
+				{
+					zpr::println("{}interface {}{}{} ({}{}{}: {}{}{})", msg::BOLD, //
+					    msg::GREEN, *config.nickname, msg::ALL_OFF,                //
+					    msg::BLUE, wg_iface, msg::ALL_OFF,                         //
+					    msg::BLUE, iface, msg::ALL_OFF                             //
+					);
+				}
+				else
+				{
+					zpr::println("{}interface {}{}{} ({}{}{})", msg::BOLD, //
+					    msg::GREEN, wg_iface, msg::ALL_OFF,                //
+					    msg::BLUE, iface, msg::ALL_OFF                     //
+					);
+				}
 #else
-			zpr::println("{}interface {}{}{}", msg::BOLD, msg::GREEN, iface, msg::ALL_OFF);
+				if(config.nickname.has_value())
+				{
+					zpr::println("{}interface {}{}{} ({}{}{})", msg::BOLD, //
+					    msg::GREEN, *config.nickname, msg::ALL_OFF,        //
+					    msg::BLUE, wg_iface, msg::ALL_OFF,                 //
+					);
+				}
+				else
+				{
+					zpr::println("{}interface {}{}{}", msg::BOLD, msg::GREEN, wg_iface, msg::ALL_OFF);
+				}
 #endif
+			}
 
 			zpr::println("  {}address:{}  {}{}{}{}/{}{}", msg::BOLD, msg::ALL_OFF, msg::YELLOW, iface_ip, msg::ALL_OFF,
 			    msg::BLUE_NB, iface_cidr, msg::ALL_OFF);
+
+			if(config.dns.has_value())
+				zpr::println("  {}dns:{}      {}{}{}", msg::BOLD, msg::ALL_OFF, msg::PINK, *config.dns, msg::ALL_OFF);
 
 			std::vector<std::string> lines {};
 			while(true)
@@ -226,41 +254,55 @@ namespace wg
 						zpr::println("  {}pubkey:{}   {}{}{}\n", msg::BOLD, msg::ALL_OFF, msg::PINK_NB, parts[1],
 						    msg::ALL_OFF);
 					}
+					else
+					{
+						zpr::println("");
+					}
 				}
 				else
 				{
 					auto pub_key = parts[0];
 					auto endpoint_str = parts[2];
-					auto ip_str = parts[3];
+					auto ip_str_ = parts[3];
 					auto last_handshake = parts[4];
 					auto rx_bytes = parts[5];
 					auto tx_bytes = parts[6];
 
-					if(ip_str.ends_with("/32"))
-						ip_str.remove_suffix(3);
+					std::vector<zst::str_view> ips {};
+					for(auto ip_part : util::split_by(ip_str_, ','))
+					{
+						if(ip_part.ends_with("/32"))
+							ip_part.remove_suffix(3);
 
-					Peer peer {};
+						ips.push_back(ip_part);
+					}
+
+					std::string peer_name {};
 					bool unknown_peer = false;
 					if(auto maybe_peer = config.lookup_peer_from_pubkey(pub_key); maybe_peer.has_value())
 					{
-						peer = *maybe_peer;
+						peer_name = maybe_peer->name;
 					}
 					else
 					{
 						unknown_peer = true;
-						peer = Peer {
-							.name = "unknown",
-							.ip = ip_str.str(),
-							.public_key = pub_key.str(),
-							.pre_shared_key = std::nullopt,
-							.keepalive = std::nullopt,
-							.endpoint = std::nullopt,
-							.extra_routes = {},
-						};
+						peer_name = "unknown";
 					}
 
-					zpr::println("  {}peer {}{}{} ({}{}{})", msg::BOLD, (unknown_peer ? msg::RED : msg::BLUE),
-					    peer.name, msg::ALL_OFF, msg::YELLOW, ip_str, msg::ALL_OFF);
+					zpr::print("  {}peer {}{}{} (", msg::BOLD, (unknown_peer ? msg::RED : msg::BLUE), peer_name,
+					    msg::ALL_OFF);
+
+					for(size_t k = 0; k < ips.size(); k++)
+					{
+						auto [_, cidr] = util::parse_ip(ips[k]);
+						if(k > 0)
+							zpr::print(", ");
+
+						zpr::print("{}{}{}{}/{}{}", msg::YELLOW, ips[k], msg::ALL_OFF, msg::BLUE_NB, cidr,
+						    msg::ALL_OFF);
+					}
+
+					zpr::println(")");
 
 					struct
 					{

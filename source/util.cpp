@@ -50,6 +50,27 @@ namespace util
 		return ret;
 	}
 
+	std::vector<zst::str_view> split_by(zst::str_view sv, char ch)
+	{
+		std::vector<zst::str_view> ret {};
+		while(not sv.empty())
+		{
+			auto i = sv.find(ch);
+			if(i == std::string::npos)
+			{
+				ret.push_back(sv);
+				break;
+			}
+
+			auto x = trim(sv.take_prefix(i));
+			ret.push_back(x);
+
+			// remove the comma
+			sv.remove_prefix(1);
+		}
+
+		return ret;
+	}
 	zst::Failable<int> write_to_file(int fd, const std::string& contents)
 	{
 		for(size_t wrote = 0; wrote < contents.size();)

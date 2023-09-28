@@ -50,20 +50,22 @@ namespace wg
 
 	Config Config::load(const std::string& filename)
 	{
-		auto path = stdfs::path(filename);
-		path.replace_extension("");
+		if(not stdfs::exists(filename))
+			msg::error_and_exit("Could not read config file {}", filename);
 
 		auto maybe_cfg = toml::parse_file(filename);
 		if(not maybe_cfg)
 			msg::error_and_exit("Failed to parse config: {}", maybe_cfg.error().description());
 
+		auto file_path = stdfs::path(filename);
+		file_path.replace_extension("");
+
+		auto path = stdfs::weakly_canonical(stdfs::path(filename) / "..");
+
 		// chdir to it so file: loads are relative to the config file
-		if(path.has_parent_path())
-		{
-			std::error_code ec {};
-			if(stdfs::current_path(path.parent_path(), ec); ec)
-				msg::error_and_exit("Failed to load config file: {}", ec.message());
-		}
+		std::error_code ec {};
+		if(stdfs::current_path(path, ec); ec)
+			msg::error_and_exit("Failed to get directory of config file: {}", ec.message());
 
 		auto& cfg = maybe_cfg.table();
 		if(not cfg.is_table())
@@ -119,7 +121,7 @@ namespace wg
 			if(not std::regex_match(address, cidr_regex))
 				msg::error_and_exit("Invalid 'address' specification; expected IPv4 address (without CIDR suffix)");
 
-			address_or_subnet = std::move(address);
+			address_or_subnet = zpr::sprint("{}/32", address);
 		}
 
 		std::vector<Peer> peers {};
@@ -245,12 +247,17 @@ namespace wg
 			    "'auto-iptables-masquerade'");
 		}
 
+		if(interface.contains("dns") and not use_wg_quick)
+			msg::warn("'dns' setting is only used when 'use-wg-quick' is true");
+
 		return Config {
-			.name = path.filename().string(),
+			.name = file_path.filename().string(),
+			.nickname = interface["nickname"].value<std::string>(),
 			.interface = interface["interface"].value<std::string>(),
 			.subnet = std::move(address_or_subnet),
 			.port = port.has_value() ? std::optional<uint16_t>(static_cast<uint16_t>(*port)) : std::nullopt,
 			.mtu = mtu,
+			.dns = interface["dns"].value<std::string>(),
 			.use_wg_quick = use_wg_quick,
 			.auto_forward = auto_forward,
 			.auto_masquerade = auto_masquerade,
@@ -316,6 +323,9 @@ namespace wg
 
 		if(this->port.has_value())
 			ret += zpr::sprint("ListenPort = {}\n", *this->port);
+
+		if(this->dns.has_value())
+			ret += zpr::sprint("DNS = {}\n", *this->dns);
 
 		if(this->auto_forward)
 		{

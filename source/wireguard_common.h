@@ -15,5 +15,5 @@ namespace wg
 	zst::Failable<int> set_wireguard_config(const Config& config, const std::string& interface_name);
 
 	bool does_interface_exist(const std::string& name);
-	Result<std::string, int> macos_get_real_interface(const std::string& wg_iface);
+	Result<std::string, int> macos_get_real_interface(const std::string& wg_iface, bool quiet = false);
 }

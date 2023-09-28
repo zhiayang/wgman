@@ -65,10 +65,12 @@ namespace wg
 	struct Config
 	{
 		std::string name;
+		std::optional<std::string> nickname;
 		std::optional<std::string> interface;
 		std::string subnet;
 		std::optional<uint16_t> port;
 		std::optional<int> mtu;
+		std::optional<std::string> dns;
 
 		bool use_wg_quick;
 		bool auto_forward;
@@ -188,6 +190,8 @@ namespace util
 
 	zst::str_view trim(zst::str_view sv);
 	std::vector<zst::str_view> split_by_spaces(zst::str_view sv);
+	std::vector<zst::str_view> split_by(zst::str_view sv, char ch);
+
 	std::string replace_all(std::string str, const std::string& target, std::string replacement);
 
 	template <typename Fn>
