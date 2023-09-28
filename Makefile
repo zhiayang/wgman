@@ -47,7 +47,7 @@ INCLUDES            := -Isource -Iexternal
 OUTPUT_BIN          := $(OUTPUT_DIR)/wgman
 
 PREFIX              ?=
-DEFINES             := -DPREFIX=$(PREFIX)
+DEFINES             := -DPREFIX=\"$(PREFIX)\"
 
 .PHONY: all clean build test format iwyu %.pdf.gdb %.pdf.lldb compile_commands.json
 .PRECIOUS: $(OUTPUT_DIR)/%.cpp.o
