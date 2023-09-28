@@ -171,7 +171,7 @@ namespace wg
 				{
 					zpr::println("{}interface {}{}{} ({}{}{})", msg::BOLD, //
 					    msg::GREEN, *config.nickname, msg::ALL_OFF,        //
-					    msg::BLUE, wg_iface, msg::ALL_OFF,                 //
+					    msg::BLUE, wg_iface, msg::ALL_OFF                  //
 					);
 				}
 				else
