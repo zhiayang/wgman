@@ -5,7 +5,11 @@ pkgver=0.5.0
 pkgrel=1
 pkgdesc='Simple WireGuard wrapper-manager-thing'
 url='https://github.com/zhiayang/wgman'
-depends=('wireguard-tools' 'libcap')
+depends=('wireguard-tools')
+if [ $(uname) = "Linux" ]; then
+	depends+=('libcap')
+fi
+
 makedepends=()
 checkdepends=()
 license=(Apache)
