@@ -298,8 +298,8 @@ namespace wg
 						if(k > 0)
 							zpr::print(", ");
 
-						zpr::print("{}{}{}{}/{}{}", msg::YELLOW, ips[k], msg::ALL_OFF, msg::BLUE_NB, cidr,
-						    msg::ALL_OFF);
+						zpr::print("{}{}{}{}/{}{}", msg::YELLOW, ips[k].take_until('/'), msg::ALL_OFF, msg::BLUE_NB,
+						    cidr, msg::ALL_OFF);
 					}
 
 					zpr::println(")");
