@@ -11,15 +11,21 @@
 #include <filesystem>
 
 #include "wgman.h"
-#include "zprocpipe.h"
+#include "wireguard_common.h"
 
 namespace wg
 {
-	namespace stdfs = std::filesystem;
+	// defined in wireguard_macos.cpp
+	Result<std::string, int> macos_get_real_interface(const std::string& wg_iface);
 
-	static Result<zprocpipe::Process, int> run_cmd(const std::string& cmd, const std::vector<std::string>& args)
+	namespace stdfs = std::filesystem;
+	zst::Failable<int> interface_up_impl(const Config& config);
+	zst::Failable<int> interface_down_impl(const Config& config);
+
+	Result<zprocpipe::Process, int>
+	run_cmd(const std::string& cmd, const std::vector<std::string>& args, bool quiet, bool change_pgid)
 	{
-		if(is_verbose())
+		if(is_verbose() && not quiet)
 		{
 			std::string p = cmd;
 			for(auto& a : args)
@@ -28,159 +34,34 @@ namespace wg
 			msg::log3("{}", p);
 		}
 
-		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args, false, false);
+		auto [maybe_proc, err] = zprocpipe::runProcess(cmd, args, quiet, quiet, change_pgid);
 		if(not maybe_proc.has_value())
-			return msg::error("Failed to launch {}{#}: {}", cmd, args, err);
+			return msg::error("Failed to launch {}{}: {}", cmd, args, err);
 
 		if(auto code = maybe_proc->wait(); code != 0)
-			return msg::error("Command {}{#} failed with exit code {}\n", cmd, args, code);
+			return msg::error("Command {}{} failed with exit code {}\n", cmd, args, code);
 
 		return Ok(std::move(*maybe_proc));
 	}
 
-
-	zst::Failable<int> up(const Config& config)
+	zst::Failable<int> set_wireguard_config(const Config& config, const std::string& interface_name)
 	{
-		if(config.use_wg_quick)
-		{
-			auto wgq_conf = config.to_wg_quick_conf();
-			auto path = zpr::sprint("/etc/wireguard/{}.conf", config.name);
-
-			int fd = open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0600);
-			if(fd < 0)
-				return msg::error("Could not create {}: {} ({})", path, strerror(errno), errno);
-
-			TRY(util::write_to_file(fd, wgq_conf));
-			close(fd);
-
-			TRY(run_cmd("wg-quick", { "up", config.name }));
-			msg::log("Done!");
-			return Ok();
-		}
-
-		if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", config.name }); code == 0)
-			return msg::error("Interface '{}' already exists", config.name);
-
-		msg::log("Creating interface {}", config.name);
-		TRY(run_cmd("ip", { "link", "add", config.name, "type", "wireguard" }));
-		auto kill_interface = util::defer([&config]() { run_cmd("ip", { "link", "delete", "dev", config.name }); });
-
 		// set the config
 		auto fifo_path = stdfs::temp_directory_path() / zpr::sprint("tmp-{}.conf", config.name);
 
 		auto wg_conf = config.to_wg_conf();
 		auto fifo_fd = open(fifo_path.c_str(), O_WRONLY | O_TRUNC | O_CREAT, 0600);
 		if(fifo_fd < 0)
-		{
-			msg::error("Failed to open config fifo: {} ({})", strerror(errno), errno);
-			return Err(0);
-		}
+			return msg::error("Failed to open config fifo: {} ({})", strerror(errno), errno);
 
 		// unlink the guy so it doesn't show up in the filesystem
 		stdfs::remove(fifo_path);
 		TRY(util::write_to_file(fifo_fd, wg_conf));
 
 		msg::log("Configuring WireGuard");
-		TRY(run_cmd("wg", { "setconf", config.name, zpr::sprint("/dev/fd/{}", fifo_fd) }));
+		TRY(run_cmd("wg", { "setconf", interface_name, zpr::sprint("/dev/fd/{}", fifo_fd) }));
 		close(fifo_fd);
 
-		kill_interface.disarm();
-
-		msg::log("IP setup");
-		TRY(run_cmd("ip", { "-4", "address", "add", config.subnet, "dev", config.name }));
-
-		if(config.mtu.has_value())
-		{
-			msg::log2("Setting MTU to {} and bringing up device", *config.mtu);
-			TRY(run_cmd("ip", { "link", "set", "mtu", zpr::sprint("{}", *config.mtu), "up", "dev", config.name }));
-		}
-		else
-		{
-			msg::log("Bringing up device");
-			TRY(run_cmd("ip", { "link", "set", "dev", config.name, "up" }));
-		}
-
-		// check which of the peer AllowedIPs are not covered by this subnet
-		for(auto& peer : config.peers)
-		{
-			auto maybe_add_route = [&config](const std::string& ip) -> zst::Failable<int> {
-				if(not util::subnet_contains_ip(config.subnet, ip))
-					TRY(run_cmd("ip", { "-4", "route", "add", ip, "dev", config.name }));
-				return Ok();
-			};
-
-			TRY(maybe_add_route(peer.ip));
-			for(auto& extra_ip : peer.extra_routes)
-				TRY(maybe_add_route(extra_ip));
-		}
-
-		if(config.auto_forward || config.auto_masquerade || config.post_up_cmd.has_value())
-			msg::log2("Running PostUp hooks");
-
-		if(config.auto_forward)
-		{
-			auto cmd = zpr::sprint("iptables -I FORWARD 1 -i {} -j ACCEPT", config.name);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		if(config.auto_masquerade)
-		{
-			assert(config.interface.has_value());
-
-			auto cmd = zpr::sprint("iptables -t nat -I POSTROUTING 1 -o {} -j MASQUERADE", *config.interface);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		if(config.post_up_cmd.has_value())
-		{
-			auto cmd = util::replace_all(*config.post_up_cmd, "%i", *config.interface);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		msg::log("Done!");
-		return Ok();
-	}
-
-	zst::Failable<int> down(const Config& config)
-	{
-		if(config.use_wg_quick)
-		{
-			TRY(run_cmd("wg-quick", { "down", config.name }));
-			msg::log("Done!");
-			return Ok();
-		}
-
-		if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", config.name }); code != 0)
-			return msg::error("Interface '{}' does not exist", config.name);
-
-		msg::log("Removing interface {}", config.name);
-		TRY(run_cmd("ip", { "link", "delete", "dev", config.name }));
-
-		if(config.auto_forward || config.auto_masquerade || config.post_down_cmd.has_value())
-			msg::log2("Running PostDown hooks");
-
-		if(config.auto_forward)
-		{
-			auto cmd = zpr::sprint("iptables -D FORWARD -i {} -j ACCEPT", config.name);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		if(config.auto_masquerade)
-		{
-			assert(config.interface.has_value());
-
-			auto cmd = zpr::sprint("iptables -t nat -D POSTROUTING -o {} -j MASQUERADE", *config.interface);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		if(config.post_down_cmd.has_value())
-		{
-			auto cmd = util::replace_all(*config.post_down_cmd, "%i", *config.interface);
-			TRY(run_cmd("bash", { "-c", cmd }));
-		}
-
-		// note: no need to manually delete routes, deleting the interface does that for us.
-		msg::log("Done!");
 		return Ok();
 	}
 
@@ -197,10 +78,89 @@ namespace wg
 			return msg::error("setsid(): %s (%d)", strerror(errno), errno);
 
 		// to prevent leaving the thing in a down state if possible, ignore errors on down.
-		wg::down(config);
+		(void) wg::down(config);
 
 		TRY(wg::up(config));
-		msg::log("Done!");
 		return Ok();
+	}
+
+	static zst::Result<std::string, int> write_wgquick_conf(const Config& config)
+	{
+		auto wgq_conf = config.to_wg_quick_conf();
+		auto conf_path = stdfs::temp_directory_path() / zpr::sprint("{}.conf", config.name);
+
+		int fd = open(conf_path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0600);
+		if(fd < 0)
+			return msg::error("Could not create {}: {} ({})", conf_path.string(), strerror(errno), errno);
+
+		// unlink the guy so it doesn't show up in the filesystem
+		TRY(util::write_to_file(fd, wgq_conf));
+		close(fd);
+
+		return Ok(conf_path.string());
+	}
+
+	zst::Failable<int> up(const Config& config)
+	{
+		if(config.use_wg_quick)
+		{
+			if(does_interface_exist(config.name))
+				return msg::error("Interface '{}' already exists", config.name);
+
+			msg::log("Creating interface {}", config.name);
+			msg::log2("Invoking wg-quick");
+
+			auto conf_path = TRY(write_wgquick_conf(config));
+
+			TRY(run_cmd("wg-quick", { "up", conf_path }, /* quiet: */ not is_verbose(), /* change_pgid: */ false));
+			stdfs::remove(conf_path);
+
+#if defined(__APPLE__)
+			// check what is the real interface on macos
+			auto real_iface = TRY(macos_get_real_interface(config.name));
+			msg::log2("Tunnel interface: {}", real_iface);
+#endif
+
+			msg::log("Done!");
+			return Ok();
+		}
+		else
+		{
+#if defined(__APPLE__)
+			msg::error("wgman on macOS can only use wg-quick!");
+			msg::log2("set `use-wg-quick = true` in the config");
+			return Err(0);
+#endif
+			return interface_up_impl(config);
+		}
+	}
+
+	zst::Failable<int> down(const Config& config)
+	{
+		if(config.use_wg_quick)
+		{
+			if(not does_interface_exist(config.name))
+				return msg::error("Interface '{}' does not exist", config.name);
+
+			msg::log("Removing interface {}", config.name);
+			msg::log2("Invoking wg-quick");
+
+			auto conf_path = TRY(write_wgquick_conf(config));
+
+			TRY(run_cmd("wg-quick", { "down", conf_path }, /* quiet: */ not is_verbose(), /* change_pgid: */ false));
+			stdfs::remove(conf_path);
+
+			msg::log("Done!");
+			return Ok();
+		}
+		else
+		{
+#if defined(__APPLE__)
+			msg::error("wgman on macOS can only use wg-quick!");
+			msg::log2("set `use-wg-quick = true` in the config");
+			return Err(0);
+#endif
+			return interface_down_impl(config);
+		}
 	}
 }

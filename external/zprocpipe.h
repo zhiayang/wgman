@@ -655,14 +655,18 @@ namespace zprocpipe
 
 		std::string readline_impl(os::Fd pipe, std::string& partial_buf)
 		{
-#if defined(_WIN32)
-
-#else
-			std::string ret = std::move(partial_buf);
-			partial_buf.clear();
+			for(size_t i = 0; i < partial_buf.size(); i++)
+			{
+				if(partial_buf[i] == '\n')
+				{
+					auto ret = partial_buf.substr(0, i + 1);
+					partial_buf.erase(0, i + 1);
+					return ret;
+				}
+			}
 
 			if(not fd_valid(pipe))
-				return ret;
+				return {};
 
 			while(true)
 			{
@@ -675,34 +679,27 @@ namespace zprocpipe
 				}
 				else if(did_read == 0)
 				{
-					for(size_t i = 0; i < ret.size(); i++)
-					{
-						if(ret[i] == '\n')
-						{
-							partial_buf.append(ret.data() + i + 1, ret.size() - i - 1);
-							ret.resize(i);
-							break;
-						}
-					}
-
-					return ret;
+					break;
 				}
 
-				// slow but meh
-				for(size_t i = 0; i < static_cast<size_t>(did_read); i++)
+				auto old_size = partial_buf.size();
+				partial_buf.append(&buf[0], static_cast<size_t>(did_read));
+
+				for(size_t i = old_size; i < partial_buf.size(); i++)
 				{
-					if(buf[i] == '\n')
+					if(partial_buf[i] == '\n')
 					{
-						ret.append(&buf[0], i);
-						partial_buf.append(&buf[i + 1], static_cast<size_t>(did_read) - i - 1);
+						auto ret = partial_buf.substr(0, i + 1);
+						partial_buf.erase(0, i + 1);
 						return ret;
 					}
 				}
-
-				// if we didn't return, then just add to the buffer and keep retrying.
-				ret.append(&buf[0], static_cast<size_t>(did_read));
 			}
-#endif
+
+			auto copy = partial_buf;
+			partial_buf.clear();
+
+			return copy;
 		}
 
 		std::string& read_impl(os::Fd pipe, std::string& partial_buf, std::string& out_str)
@@ -730,12 +727,14 @@ namespace zprocpipe
 		    const std::vector<std::string>& args,
 		    const std::filesystem::path& cwd,
 		    bool capture_stdout,
-		    bool capture_stderr);
+		    bool capture_stderr,
+		    bool change_pgid);
 
 		inline friend std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
 		    const std::vector<std::string>& args,
 		    bool capture_stdout,
-		    bool capture_stderr);
+		    bool capture_stderr,
+		    bool change_pgid);
 	};
 
 
@@ -744,7 +743,8 @@ namespace zprocpipe
 	    const std::vector<std::string>& args,
 	    const std::filesystem::path& cwd,
 	    bool capture_stdout = true,
-	    bool capture_stderr = true)
+	    bool capture_stderr = true,
+	    bool change_pgid = true)
 	{
 		auto [stdin_pipe_read, stdin_pipe_write] = os::make_pipe();
 		auto [stdout_pipe_read, stdout_pipe_write] = os::make_pipe();
@@ -772,7 +772,8 @@ namespace zprocpipe
 			os::close_file(stderr_pipe_read);
 
 			std::filesystem::current_path(cwd);
-			setpgid(getpid(), getpid());
+			if(change_pgid)
+				setpgid(0, 0);
 
 			auto arg_array = os::make_argument_array(process, args);
 			if(auto err = execvp(process.c_str(), arg_array); err < 0)
@@ -800,8 +801,9 @@ namespace zprocpipe
 	inline std::pair<std::optional<Process>, std::string> runProcess(const std::string& process,
 	    const std::vector<std::string>& args,
 	    bool capture_stdout = true,
-	    bool capture_stderr = true)
+	    bool capture_stderr = true,
+	    bool change_pgid = true)
 	{
-		return runProcess(process, args, std::filesystem::current_path(), capture_stdout, capture_stderr);
+		return runProcess(process, args, std::filesystem::current_path(), capture_stdout, capture_stderr, change_pgid);
 	}
 }

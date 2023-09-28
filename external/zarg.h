@@ -68,6 +68,7 @@ namespace zarg
 	struct Parser
 	{
 		ArgumentList parse(int argc, char** argv);
+		ArgumentList consume(int& argc, char**& argv);
 
 		Parser& add_flag(char flag, std::string description = "");
 		Parser& add_option(char short_opt, bool needs_value, std::string description = "");
@@ -79,6 +80,8 @@ namespace zarg
 		Parser& ignore_unknown_flags(bool x = true);
 
 	private:
+		ArgumentList parse(int argc, char** argv, int* num_args);
+
 		struct Option
 		{
 			char flag_or_short_opt;
@@ -179,13 +182,33 @@ namespace zarg
 		return ret;
 	}
 
+	ArgumentList Parser::consume(int& argc, char**& argv)
+	{
+		int num_args = 0;
+		auto ret = this->parse(argc, argv, &num_args);
+		argc -= num_args;
+		argv += num_args;
+
+		return ret;
+	}
+
 	ArgumentList Parser::parse(int argc, char** argv)
 	{
+		int unused = 0;
+		return this->parse(argc, argv, &unused);
+	}
+
+	ArgumentList Parser::parse(int argc, char** argv, int* num_args)
+	{
+		*num_args = 0;
+
 		ArgumentList ret {};
 
 		bool no_more_opts = false;
 		for(int arg_num = 1; arg_num < argc; arg_num++)
 		{
+			*num_args += 1;
+
 			auto arg = std::string_view(argv[arg_num]);
 			if(arg.empty())
 				continue;

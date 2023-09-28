@@ -21,6 +21,11 @@ ifeq ("$(findstring gcc,$(CXX_VERSION_STRING))", "gcc")
 else
 endif
 
+UNAME_IDENT := $(shell uname)
+ifeq ("$(UNAME_IDENT)", "Linux")
+    LIBCAP_LIB = -lcap
+endif
+
 OPT_FLAGS           := -O2
 LINKER_OPT_FLAGS    :=
 COMMON_CFLAGS       := -g $(OPT_FLAGS)
@@ -41,6 +46,9 @@ INCLUDES            := -Isource -Iexternal
 
 OUTPUT_BIN          := $(OUTPUT_DIR)/wgman
 
+PREFIX              ?=
+DEFINES             := -DPREFIX=$(PREFIX)
+
 .PHONY: all clean build test format iwyu %.pdf.gdb %.pdf.lldb compile_commands.json
 .PRECIOUS: $(OUTPUT_DIR)/%.cpp.o
 .DEFAULT_GOAL = all
@@ -54,7 +62,7 @@ compdb: $(CXX_COMPDB) $(SPECIAL_HDRS_COMPDB)
 $(OUTPUT_BIN): $(PRECOMP_OBJ) $(CXXOBJ) $(EXTERNAL_OBJS)
 	@echo "  $(notdir $@)"
 	@mkdir -p $(shell dirname $@)
-	@$(CXX) $(CXXFLAGS) $(WARNINGS) $(DEFINES) $(LDFLAGS) $(LINKER_OPT_FLAGS) -o $@ $^ -lcap
+	@$(CXX) $(CXXFLAGS) $(WARNINGS) $(DEFINES) $(LDFLAGS) $(LINKER_OPT_FLAGS) -o $@ $^ $(LIBCAP_LIB)
 
 $(OUTPUT_DIR)/%.cpp.o: %.cpp $(PRECOMP_GCH)
 	@echo "  $<"

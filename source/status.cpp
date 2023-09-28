@@ -11,6 +11,7 @@
 
 #include "wgman.h"
 #include "zprocpipe.h"
+#include "wireguard_common.h"
 
 namespace wg
 {
@@ -107,17 +108,30 @@ namespace wg
 		}
 
 		std::sort(interfaces.begin(), interfaces.end());
-		for(auto& iface : interfaces)
+		for(auto& wg_iface : interfaces)
 		{
-			auto config = Config::load(config_path / (iface + ".toml"));
+			auto config = Config::load(config_path / (wg_iface + ".toml"));
 			zpr::print("{}", msg::ALL_OFF);
 
-			if(auto [_, code] = util::try_command("ip", { "link", "show", "dev", iface }); code != 0)
+#if defined(__APPLE__)
+			auto maybe_real_iface = macos_get_real_interface(wg_iface);
+			if(maybe_real_iface.is_err())
+			{
+				zpr::println("{}interface {}{}{}: {}down{}", msg::BOLD, msg::GREEN, wg_iface, //
+				    msg::ALL_OFF, msg::RED, msg::ALL_OFF);
+				continue;
+			}
+
+			auto iface = *maybe_real_iface;
+#else
+			auto& iface = wg_iface;
+			if(not does_interface_exist(iface))
 			{
 				zpr::println("{}interface {}{}{}: {}down{}", msg::BOLD, msg::GREEN, iface, //
 				    msg::ALL_OFF, msg::RED, msg::ALL_OFF);
 				continue;
 			}
+#endif
 
 			auto maybe_proc = wg_show(iface);
 			if(maybe_proc.is_err())
@@ -135,7 +149,12 @@ namespace wg
 			auto iface_ip = zst::str_view(config.subnet).take_until('/');
 			auto iface_cidr = zst::str_view(config.subnet).drop_until('/').drop(1);
 
+#if defined(__APPLE__)
+			zpr::println("{}interface {}{}{} [{}{}{}]{}", msg::BOLD, msg::GREEN, wg_iface, msg::UNCOLOUR, msg::BLUE,
+			    iface, msg::UNCOLOUR, msg::ALL_OFF);
+#else
 			zpr::println("{}interface {}{}{}", msg::BOLD, msg::GREEN, iface, msg::ALL_OFF);
+#endif
 
 			zpr::println("  {}address:{}  {}{}{}{}/{}{}", msg::BOLD, msg::ALL_OFF, msg::YELLOW, iface_ip, msg::ALL_OFF,
 			    msg::BLUE_NB, iface_cidr, msg::ALL_OFF);

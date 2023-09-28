@@ -455,6 +455,21 @@ namespace zst
 				return this->remove_suffix(n);
 			}
 
+			template <std::integral IntType>
+			constexpr inline str_view take_int(IntType& out) const
+			{
+				out = 0;
+				auto copy = *this;
+
+				while(not copy.empty() && '0' <= copy[0] && copy[0] <=  '9')
+				{
+					out = 10 * out + (copy[0] - '0');
+					copy.remove_prefix(1);
+				}
+
+				return copy;
+			}
+
 		#if ZST_USE_STD
 			template <typename T = value_type, std::enable_if_t<std::is_trivial_v<T> && std::is_same_v<T, value_type>, int> = 0>
 			str_view(const std::basic_string<value_type>& s) : ptr(s.data()), len(s.size()) { }
@@ -1575,6 +1590,11 @@ constexpr inline zst::byte_span operator""_bs(const char* s, size_t n)
 /*
     Version History
     ===============
+
+    2.1.0 - 28/09/2023
+    ------------------
+    - Add int conversion for str_view
+
 
     2.0.1 - 31/07/2023
     ------------------

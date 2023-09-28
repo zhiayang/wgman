@@ -11,3 +11,5 @@ __pycache__
 /tmp
 .mypy_cache
 .vscode
+compile_flags.txt
+compile_commands.json

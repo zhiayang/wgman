@@ -71,14 +71,19 @@ namespace wg
 
 		auto& table = *cfg.as_table();
 		if(not table.contains("interface") || not table["interface"].is_table())
-			msg::error_and_exit("Missing required key 'interface'");
+			msg::error_and_exit("Missing required table [interface]");
 
 		auto& interface = *table["interface"].as_table();
-		for(auto key : { "subnet", "private-key" })
-		{
-			if(not interface.contains(key))
-				msg::error_and_exit("Missing required key '{}' in 'interface'", key);
-		}
+		if(not interface.contains("private-key"))
+			msg::error_and_exit("Missing required key 'private-key' in [interface]");
+
+		bool have_subnet = interface.contains("subnet");
+		bool have_address = interface.contains("address");
+
+		if(not have_subnet && not have_address)
+			msg::error_and_exit("[interface] must specify either 'subnet' or 'address'");
+		else if(have_subnet && have_address)
+			msg::error_and_exit("[interface] must specify only one of 'subnet' or 'address' (not both)");
 
 		std::optional<int64_t> port {};
 		if(interface.contains("port") && not interface["port"].is_integer())
@@ -95,10 +100,27 @@ namespace wg
 		else if(interface.contains("mtu"))
 			mtu = *interface["mtu"].value<int64_t>();
 
-		auto subnet = *interface["subnet"].value<std::string>();
-		auto cidr_regex = std::regex(R"(([0-9]{1,3})(\.[0-9]{1,3}){3}/[0-9]+)");
-		if(not std::regex_match(subnet, cidr_regex))
-			msg::error_and_exit("Invalid 'subnet' specification; expected subnet in CIDR notation");
+		std::string address_or_subnet {};
+		if(have_subnet)
+		{
+			auto subnet = *interface["subnet"].value<std::string>();
+			auto cidr_regex = std::regex(R"(([0-9]{1,3})(\.[0-9]{1,3}){3}/[0-9]+)");
+			if(not std::regex_match(subnet, cidr_regex))
+				msg::error_and_exit("Invalid 'subnet' specification; expected subnet in CIDR notation");
+
+			address_or_subnet = std::move(subnet);
+		}
+		else
+		{
+			assert(have_address);
+
+			auto address = *interface["address"].value<std::string>();
+			auto cidr_regex = std::regex(R"(([0-9]{1,3})(\.[0-9]{1,3}){3})");
+			if(not std::regex_match(address, cidr_regex))
+				msg::error_and_exit("Invalid 'address' specification; expected IPv4 address (without CIDR suffix)");
+
+			address_or_subnet = std::move(address);
+		}
 
 		std::vector<Peer> peers {};
 		if(not cfg.contains("peer"))
@@ -210,6 +232,12 @@ namespace wg
 		bool auto_forward = get_bool("auto-iptables-forward");
 		bool auto_masquerade = get_bool("auto-iptables-masquerade");
 
+#if defined(__APPLE__)
+		// check some macos things
+		if(auto_forward || auto_masquerade)
+			msg::warn("Ignoring unsupported options (for macOS) `auto-iptables-*`");
+#endif
+
 		if(auto_masquerade && not interface.contains("interface"))
 		{
 			msg::error_and_exit(
@@ -220,7 +248,7 @@ namespace wg
 		return Config {
 			.name = path.filename().string(),
 			.interface = interface["interface"].value<std::string>(),
-			.subnet = std::move(subnet),
+			.subnet = std::move(address_or_subnet),
 			.port = port.has_value() ? std::optional<uint16_t>(static_cast<uint16_t>(*port)) : std::nullopt,
 			.mtu = mtu,
 			.use_wg_quick = use_wg_quick,

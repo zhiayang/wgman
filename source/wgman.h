@@ -183,6 +183,7 @@ namespace util
 	IPSubnet parse_ip(zst::str_view ip);
 	bool subnet_contains_ip(zst::str_view subnet, zst::str_view ip);
 
+	zst::Result<zst::unique_span<uint8_t[]>, int> read_entire_file(const std::string& path);
 	zst::Failable<int> write_to_file(int fd, const std::string& contents);
 
 	zst::str_view trim(zst::str_view sv);

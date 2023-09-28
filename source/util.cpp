@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+
 #include <regex>
 
 #include "wgman.h"
@@ -24,10 +27,10 @@ namespace util
 		if(sv.empty())
 			return sv;
 
-		while(sv[0] == ' ' || sv[0] == '\t' || sv[0] == '\r' || sv[0] == '\n')
+		while(not sv.empty() && (sv[0] == ' ' || sv[0] == '\t' || sv[0] == '\r' || sv[0] == '\n'))
 			sv.remove_prefix(1);
 
-		while(sv.back() == ' ' || sv.back() == '\t' || sv.back() == '\r' || sv.back() == '\n')
+		while(not sv.empty() && (sv.back() == ' ' || sv.back() == '\t' || sv.back() == '\r' || sv.back() == '\n'))
 			sv.remove_suffix(1);
 
 		return sv;
@@ -61,6 +64,27 @@ namespace util
 			wrote += static_cast<size_t>(did_write);
 		}
 		return Ok();
+	}
+
+	zst::Result<zst::unique_span<uint8_t[]>, int> read_entire_file(const std::string& path)
+	{
+		auto fd = open(path.c_str(), O_RDONLY);
+		if(fd < 0)
+			return msg::error("failed to open '{}'; open(): {}", path, strerror(errno));
+
+		struct stat st;
+		if(fstat(fd, &st) < 0)
+			return msg::error("failed to stat '{}'; fstat(): {}", path, strerror(errno));
+
+		auto size = static_cast<size_t>(st.st_size);
+		auto ptr = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, /* offset: */ 0);
+		if(ptr == reinterpret_cast<void*>(-1))
+			return msg::error("failed to read '{}': mmap(): {}", path, strerror(errno));
+
+		close(fd);
+		return Ok(zst::unique_span<uint8_t[]>((uint8_t*) ptr, size, [](const void* p, size_t n) {
+			munmap(const_cast<void*>(p), n);
+		}));
 	}
 
 	std::string replace_all(std::string str, const std::string& target, std::string replacement)

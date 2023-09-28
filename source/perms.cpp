@@ -6,12 +6,14 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <sys/capability.h>
 
 #include "wgman.h"
 
 namespace wg
 {
+#if defined(__linux__)
+	#include <sys/capability.h>
+
 	static bool have_cap(cap_t caps, cap_value_t cap)
 	{
 		cap_flag_value_t value;
@@ -70,4 +72,19 @@ namespace wg
 		if(cap_reset_ambient() != 0)
 			msg::error_and_exit("Failed to reset ambient capabilities: {} ({})", strerror(errno), errno);
 	}
+#else
+
+	perms check_perms()
+	{
+		if(geteuid() == 0)
+			return perms::ROOT;
+
+		return perms::NONE;
+	}
+
+	void set_ambient_perms() { }
+	void reset_ambient_perms() { }
+
+#endif
+
 }

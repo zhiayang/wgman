@@ -7,7 +7,11 @@
 
 #include "wgman.h"
 
-constexpr const char* DEFAULT_DIR = "/etc/wgman";
+#ifndef PREFIX
+#define PREFIX ""
+#endif
+
+constexpr const char* DEFAULT_DIR = PREFIX "/etc/wgman";
 
 static void print_help()
 {
@@ -45,6 +49,10 @@ int main(int argc, char** argv)
 		argc -= 1;
 		argv += 1;
 
+		auto cmd = std::string_view(argv[0]);
+		auto old_argc = argc;
+		auto old_argv = argv;
+
 		auto args =
 		    zarg::Parser() //
 		        .add_option('d', "dir", true)
@@ -52,13 +60,11 @@ int main(int argc, char** argv)
 		        .add_option('v', "verbose", false)
 		        .allow_options_after_positionals()
 		        .ignore_unknown_flags()
-		        .parse(argc, argv)
+		        .consume(argc, argv)
 		        .set();
 
 		auto dir = args.get_option("dir").value_or(DEFAULT_DIR);
 		s_is_verbose = args.has_option("verbose");
-
-		auto cmd = std::string_view(argv[0]);
 
 		if(cmd == "status")
 		{
@@ -69,15 +75,15 @@ int main(int argc, char** argv)
 				zpr::println("print the status for all known WireGuard interfaces\n");
 
 				zpr::println("Options:");
-				zpr::println("  -k, --no-keys       don't print public keys\n");
+				zpr::println("  -k, --keys          print public keys\n");
 				return 0;
 			}
 
 			auto sub_args =
 			    zarg::Parser() //
-			        .add_option('k', "no-keys", false, "")
-			        .allow_options_after_positionals()
-			        .parse(argc, argv)
+			        .add_option('k', "keys", false, "")
+			        .ignore_unknown_flags()
+			        .parse(old_argc, old_argv)
 			        .set();
 
 			if(sub_args.positional.size() > 1)
@@ -93,7 +99,7 @@ int main(int argc, char** argv)
 			if(wg::check_perms() == wg::perms::NONE)
 				msg::error_and_exit("Insufficient permissions");
 			else
-				wg::status(dir, iface, /* show_keys: */ not sub_args.has_option("no-keys"));
+				wg::status(dir, iface, /* show_keys: */ sub_args.has_option("keys"));
 		}
 		else if(cmd == "up" || cmd == "down" || cmd == "restart")
 		{
@@ -123,8 +129,8 @@ int main(int argc, char** argv)
 			if(args.positional.size() != 1)
 				msg::error_and_exit("Expected exactly one interface");
 
-			if(wg::check_perms() != wg::perms::ROOT)
-				msg::error_and_exit("Insufficient permissions");
+			// if(wg::check_perms() != wg::perms::ROOT)
+			// 	msg::error_and_exit("Insufficient permissions");
 
 			auto fn = (cmd == "up" ? &wg::up : cmd == "down" ? &wg::down : &wg::restart);
 			if(fn(wg::Config::load(zpr::sprint("{}/{}.toml", dir, args.positional[0]))).is_err())
