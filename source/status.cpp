@@ -75,7 +75,10 @@ namespace wg
 		return Ok(std::move(*proc));
 	}
 
-	void status(const std::string& config_path_, const std::optional<std::string>& interface, bool show_keys)
+	void status(const std::string& config_path_,
+	    const std::optional<std::string>& interface,
+	    bool show_keys,
+	    bool show_extra_routes)
 	{
 		auto config_path = stdfs::path(config_path_);
 
@@ -300,6 +303,9 @@ namespace wg
 
 						zpr::print("{}{}{}{}/{}{}", msg::YELLOW, ips[k].take_until('/'), msg::ALL_OFF, msg::BLUE_NB,
 						    cidr, msg::ALL_OFF);
+
+						if(not show_extra_routes)
+							break;
 					}
 
 					zpr::println(")");

@@ -103,7 +103,10 @@ namespace wg
 	zst::Failable<int> up(const Config& config);
 	zst::Failable<int> down(const Config& config);
 	zst::Failable<int> restart(const Config& config);
-	void status(const std::string& config_path, const std::optional<std::string>& interface, bool show_keys);
+	void status(const std::string& config_path,
+	    const std::optional<std::string>& interface,
+	    bool show_keys,
+	    bool show_extra_routes);
 }
 
 
