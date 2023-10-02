@@ -51,7 +51,7 @@ int main(int argc, char** argv)
 	        .consume(argc, argv)
 	        .set();
 
-	auto cmd = args.positional.empty() ? "status" : std::string_view(args.positional[0]);
+	std::string cmd = args.positional.empty() ? "status" : args.positional[0];
 	if(not args.positional.empty())
 		args.positional.erase(args.positional.begin());
 
